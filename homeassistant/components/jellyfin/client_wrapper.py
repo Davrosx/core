@@ -120,9 +120,16 @@ def get_artwork_url(
         return None
 
     artwork_url = client.jellyfin.artwork(artwork_id, artwork_type, max_width)
+        # ADD DEBUG LOGGING HERE
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Original artwork URL from API: {artwork_url}")
+    logger.debug(f"artwork_id: {artwork_id}, artwork_type: {artwork_type}, max_width: {max_width}")
+    
     if artwork_url:
-    # Use urljoin to normalize the URL (fixes double slashes)
-        return str(urljoin(artwork_url, "."))
+        fixed_url = urljoin(str(artwork_url), ".")
+        logger.debug(f"Fixed URL after urljoin: {fixed_url}")
+        return fixed_url
     return None
 
 
