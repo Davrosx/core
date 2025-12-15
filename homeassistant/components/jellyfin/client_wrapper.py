@@ -15,7 +15,7 @@ from jellyfin_apiclient_python.connection_manager import (
 from homeassistant import exceptions
 from homeassistant.const import CONF_PASSWORD, CONF_URL, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-
+from urllib.parse import urljoin
 from .const import CLIENT_VERSION, ITEM_KEY_IMAGE_TAGS, USER_AGENT, USER_APP_NAME
 
 
@@ -119,7 +119,11 @@ def get_artwork_url(
     else:
         return None
 
-    return str(client.jellyfin.artwork(artwork_id, artwork_type, max_width))
+    artwork_url = client.jellyfin.artwork(artwork_id, artwork_type, max_width)
+    if artwork_url:
+    # Use urljoin to normalize the URL (fixes double slashes)
+        return str(urljoin(artwork_url, "."))
+    return None
 
 
 class CannotConnect(exceptions.HomeAssistantError):
