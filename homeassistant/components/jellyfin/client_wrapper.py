@@ -1,5 +1,6 @@
 """Utility methods for initializing a Jellyfin client."""
-
+# Get logger for this module
+_LOGGER = logging.getLogger(__name__)
 from __future__ import annotations
 
 import socket
@@ -119,16 +120,28 @@ def get_artwork_url(
     else:
         return None
 
+       
     artwork_url = client.jellyfin.artwork(artwork_id, artwork_type, max_width)
-        # ADD DEBUG LOGGING HERE
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.debug(f"Original artwork URL from API: {artwork_url}")
-    logger.debug(f"artwork_id: {artwork_id}, artwork_type: {artwork_type}, max_width: {max_width}")
+    
+    # DEBUG LOGGING - This will appear in HA logs
+    _LOGGER.debug(
+        "Artwork URL debug - Original: %s, Type: %s, ID: %s, ArtType: %s, Width: %s",
+        artwork_url,
+        type(artwork_url),
+        artwork_id,
+        artwork_type,
+        max_width
+    )
     
     if artwork_url:
+        # Log what urljoin does
         fixed_url = urljoin(str(artwork_url), ".")
-        logger.debug(f"Fixed URL after urljoin: {fixed_url}")
+        _LOGGER.debug("After urljoin: %s", fixed_url)
+        
+        # Check if query params exist
+        if '?' not in str(artwork_url):
+            _LOGGER.warning("Artwork URL missing query parameters! Raw: %s", artwork_url)
+        
         return fixed_url
     return None
 
