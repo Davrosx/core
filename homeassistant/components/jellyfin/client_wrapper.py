@@ -1,10 +1,11 @@
 """Utility methods for initializing a Jellyfin client."""
+
 from __future__ import annotations
 
-import logging
 import re
 import socket
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from jellyfin_apiclient_python import Jellyfin, JellyfinClient
 from jellyfin_apiclient_python.api import API
@@ -16,11 +17,9 @@ from jellyfin_apiclient_python.connection_manager import (
 from homeassistant import exceptions
 from homeassistant.const import CONF_PASSWORD, CONF_URL, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-from urllib.parse import urlparse, urlunparse
+
 from .const import CLIENT_VERSION, ITEM_KEY_IMAGE_TAGS, USER_AGENT, USER_APP_NAME
 
-# Get logger for this module
-_LOGGER = logging.getLogger(__name__)
 
 async def validate_input(
     hass: HomeAssistant, user_input: dict[str, Any], client: JellyfinClient
@@ -95,15 +94,16 @@ def _get_user_id(api: API) -> str:
     return userid
 
 
-def _normalize_url_path_keep_query(url: str) -> str:
-    """Normalize repeated slashes in the path component of a URL while preserving query."""
-    parsed = urlparse(url)
-    # Collapse multiple slashes in the path to a single slash (preserve leading slash)
-    normalized_path = re.sub(r"/+", "/", parsed.path)
-    if normalized_path != parsed.path:
-        new = parsed._replace(path=normalized_path)
-        return urlunparse(new)
-    return url
+def _normalize_artwork_url(url: str) -> str:
+    """Normalize artwork URL by collapsing duplicate slashes in the path.
+
+    Only the path portion is modified so that scheme (e.g. https://) and
+    the netloc (host:port) are preserved.
+    """
+    parts = urlsplit(url)
+    # Collapse multiple consecutive slashes in the path to a single slash
+    new_path = re.sub("/{2,}", "/", parts.path)
+    return urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
 
 
 def get_artwork_url(
@@ -114,9 +114,6 @@ def get_artwork_url(
     artwork_type: str | None = None
     parent_backdrop_id: str | None = item.get("ParentBackdropItemId")
 
-    # Be defensive: ITEM_KEY_IMAGE_TAGS may not be present
-    image_tags = item.get(ITEM_KEY_IMAGE_TAGS) or []
-
     if "AlbumPrimaryImageTag" in item:
         # jellyfin_apiclient_python doesn't support passing a specific tag to `.artwork`,
         # so we don't use the actual value of AlbumPrimaryImageTag.
@@ -124,44 +121,21 @@ def get_artwork_url(
         # and the resulting URL will pull the primary album art even if the tag is not specified.
         artwork_type = "Primary"
         artwork_id = item["AlbumId"]
-    elif "Backdrop" in image_tags:
+    elif "Backdrop" in item[ITEM_KEY_IMAGE_TAGS]:
         artwork_type = "Backdrop"
         artwork_id = item["Id"]
     elif parent_backdrop_id:
         artwork_type = "Backdrop"
         artwork_id = parent_backdrop_id
-    elif "Primary" in image_tags:
+    elif "Primary" in item[ITEM_KEY_IMAGE_TAGS]:
         artwork_type = "Primary"
         artwork_id = item["Id"]
     else:
         return None
 
-    artwork_url = client.jellyfin.artwork(artwork_id, artwork_type, max_width)
-
-    # DEBUG LOGGING - This will appear in HA logs
-    _LOGGER.debug(
-        "Artwork URL debug - Original: %s, Type: %s, ID: %s, ArtType: %s, Width: %s",
-        artwork_url,
-        type(artwork_url),
-        artwork_id,
-        artwork_type,
-        max_width,
-    )
-
-    if artwork_url:
-        artwork_url_str = str(artwork_url)
-
-        # Normalize only the path (collapse duplicate slashes) while preserving query parameters.
-        fixed_url = _normalize_url_path_keep_query(artwork_url_str)
-        if fixed_url != artwork_url_str:
-            _LOGGER.debug("Normalized artwork URL path: %s -> %s", artwork_url_str, fixed_url)
-
-        # Check if query params exist
-        if "?" not in fixed_url:
-            _LOGGER.warning("Artwork URL missing query parameters! Raw: %s", fixed_url)
-
-        return fixed_url
-    return None
+    raw_url = str(client.jellyfin.artwork(artwork_id, artwork_type, max_width))
+    # Normalize the URL to remove double slashes in the path (e.g., after host:port)
+    return _normalize_artwork_url(raw_url)
 
 
 class CannotConnect(exceptions.HomeAssistantError):
