@@ -1,8 +1,7 @@
 """Utility methods for initializing a Jellyfin client."""
-# Get logger for this module
-_LOGGER = logging.getLogger(__name__)
 from __future__ import annotations
 
+import logging
 import socket
 from typing import Any
 
@@ -19,6 +18,8 @@ from homeassistant.core import HomeAssistant
 from urllib.parse import urljoin
 from .const import CLIENT_VERSION, ITEM_KEY_IMAGE_TAGS, USER_AGENT, USER_APP_NAME
 
+# Get logger for this module
+_LOGGER = logging.getLogger(__name__)
 
 async def validate_input(
     hass: HomeAssistant, user_input: dict[str, Any], client: JellyfinClient
