@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util.dt import parse_datetime
 
 from .browse_media import build_item_response, build_root_response, search_items
-from .client_wrapper import get_artwork_url
+from .client_wrapper import get_artwork_url, get_primary_artwork_url
 from .const import CONTENT_TYPE_MAP, LOGGER, MAX_IMAGE_WIDTH
 from .coordinator import JellyfinConfigEntry, JellyfinDataUpdateCoordinator
 from .entity import JellyfinClientEntity
@@ -68,6 +68,9 @@ class JellyfinMediaPlayer(JellyfinClientEntity, MediaPlayerEntity):
             "NowPlayingItem"
         )
         self.play_state: dict[str, Any] | None = self.session_data.get("PlayState")
+
+        # Track the Primary artwork URL for extra state attributes
+        self._primary_image_url: str | None = None
 
         self._update_from_session_data()
 
@@ -132,6 +135,16 @@ class JellyfinMediaPlayer(JellyfinClientEntity, MediaPlayerEntity):
                 if media_artists := self.now_playing.get("Artists"):
                     media_artist = str(media_artists[0])
 
+            # Populate the Primary artwork URL for the now playing item
+            try:
+                self._primary_image_url = get_primary_artwork_url(
+                    self.coordinator.api_client, self.now_playing, MAX_IMAGE_WIDTH
+                )
+            except Exception:  # pragma: no cover - defensive
+                self._primary_image_url = None
+        else:
+            self._primary_image_url = None
+
         if self.play_state is not None:
             if self.play_state.get("IsPaused"):
                 state = MediaPlayerState.PAUSED
@@ -177,6 +190,21 @@ class JellyfinMediaPlayer(JellyfinClientEntity, MediaPlayerEntity):
         return get_artwork_url(
             self.coordinator.api_client, self.now_playing, MAX_IMAGE_WIDTH
         )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return additional state attributes.
+
+        Expose the Jellyfin 'Primary' image URL for the now-playing item as
+        `media_primary_image` when available.
+        """
+        base_attrs = super().extra_state_attributes or {}
+        attrs: dict[str, Any] = dict(base_attrs)
+
+        if self._primary_image_url:
+            attrs["media_primary_image"] = self._primary_image_url
+
+        return attrs or None
 
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
