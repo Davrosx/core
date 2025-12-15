@@ -106,6 +106,40 @@ def _normalize_artwork_url(url: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
 
 
+def get_artwork_url_for_type(
+    client: JellyfinClient, artwork_id: str, artwork_type: str, max_width: int = 600
+) -> str | None:
+    """Return an artwork URL for a specific artwork type (e.g. 'Primary', 'Backdrop')."""
+    try:
+        raw_url = str(client.jellyfin.artwork(artwork_id, artwork_type, max_width))
+    except Exception:
+        return None
+    return _normalize_artwork_url(raw_url)
+
+
+def get_primary_artwork_url(
+    client: JellyfinClient, item: dict[str, Any], max_width: int = 600
+) -> str | None:
+    """Return the 'Primary' artwork URL for an item.
+
+    This handles album primary images (AlbumId + AlbumPrimaryImageTag) as well
+    as item primary images (Id + Primary tag).
+    """
+    artwork_id: str | None = None
+
+    # If the item indicates an album primary image, use the album id.
+    if "AlbumPrimaryImageTag" in item:
+        artwork_id = item.get("AlbumId")
+    # Otherwise, if the item has a Primary image tag, use the item id.
+    elif ITEM_KEY_IMAGE_TAGS in item and "Primary" in item[ITEM_KEY_IMAGE_TAGS]:
+        artwork_id = item.get("Id")
+
+    if not artwork_id:
+        return None
+
+    return get_artwork_url_for_type(client, artwork_id, "Primary", max_width)
+
+
 def get_artwork_url(
     client: JellyfinClient, item: dict[str, Any], max_width: int = 600
 ) -> str | None:
