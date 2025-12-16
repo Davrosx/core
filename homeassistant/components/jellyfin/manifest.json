@@ -1,7 +1,7 @@
 {
   "domain": "jellyfin",
   "name": "Jellyfin",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "codeowners": ["@Davrosx"],
   "config_flow": true,
   "documentation": "https://github.com/Davrosx/core/tree/dev/homeassistant/components/jellyfin",
