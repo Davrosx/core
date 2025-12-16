@@ -126,14 +126,12 @@ def get_primary_artwork_url(
     as item primary images (Id + Primary tag).
     """
     artwork_id: str | None = None
-
-    # If the item indicates an album primary image, use the album id.
-    if "AlbumPrimaryImageTag" in item:
-        artwork_id = item.get("AlbumId")
-    # Otherwise, if the item has a Primary image tag, use the item id.
-    elif ITEM_KEY_IMAGE_TAGS in item and "Primary" in item[ITEM_KEY_IMAGE_TAGS]:
+    # Iif the item has a Primary image tag, use the item id.
+    if ITEM_KEY_IMAGE_TAGS in item and "Primary" in item[ITEM_KEY_IMAGE_TAGS]:
         artwork_id = item.get("Id")
-
+    # If the item indicates an album primary image, use the album id.
+    elif "AlbumPrimaryImageTag" in item:
+        artwork_id = item.get("AlbumId")
     if not artwork_id:
         return None
 
@@ -147,8 +145,11 @@ def get_artwork_url(
     artwork_id: str | None = None
     artwork_type: str | None = None
     parent_backdrop_id: str | None = item.get("ParentBackdropItemId")
-
-    if "AlbumPrimaryImageTag" in item:
+    
+    if "Primary" in item[ITEM_KEY_IMAGE_TAGS]:
+        artwork_type = "Primary"
+        artwork_id = item["Id"]
+    elif "AlbumPrimaryImageTag" in item:
         # jellyfin_apiclient_python doesn't support passing a specific tag to `.artwork`,
         # so we don't use the actual value of AlbumPrimaryImageTag.
         # However, its mere presence tells us that the album does have primary artwork,
@@ -161,9 +162,6 @@ def get_artwork_url(
     elif parent_backdrop_id:
         artwork_type = "Backdrop"
         artwork_id = parent_backdrop_id
-    elif "Primary" in item[ITEM_KEY_IMAGE_TAGS]:
-        artwork_type = "Primary"
-        artwork_id = item["Id"]
     else:
         return None
 
